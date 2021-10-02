@@ -53,11 +53,12 @@ if __name__ == '__main__':
     p.add_argument('chome_loc', help='path to chrome driver')
     p.add_argument('download_loc', help='download destination of chrome profile. Default chrome\
     setting is /home/usr/downloads/')
-
-    dbgwas_dir = os.path.abspath(dbgwas_dir)
-    dest_dir = os.path.abspath(dest_dir)
-    chrome_loc = os.path.abspath(chrome_loc)
-    download_loc = os.path.abspath(download_loc)
+    params = vars(p.parse_args())
+    
+    dbgwas_dir = os.path.abspath(params['dbgwas_dir'])
+    dest_dir = os.path.abspath(params['dest_dir'])
+    chrome_loc = os.path.abspath(params['chrome_loc'])
+    download_loc = os.path.abspath(params['download_loc'])
     
     download_file = os.path.join(download_loc, 'graph2cytoscapeDesktop.json')
     if os.path.isfile(download_file):
