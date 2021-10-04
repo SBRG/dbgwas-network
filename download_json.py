@@ -48,7 +48,7 @@ if __name__ == '__main__':
         
     p = argparse.ArgumentParser(description='Download json network files from interactive DB\
                                              GWAS HTML output.')
-    p.add_argument('dbgwas_dir', help=ddrir_help)
+    p.add_argument('dbgwas_dir', help=ddir_help)
     p.add_argument('dest_dir', help=dsdir_help)
     p.add_argument('chome_loc', help='path to chrome driver')
     p.add_argument('download_loc', help='download destination of chrome profile. Default chrome\
