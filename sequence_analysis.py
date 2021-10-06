@@ -125,7 +125,7 @@ def update_metadata(mutations, md_file):
 		path to the metadata file
 	"""
 	md = pd.read_csv(md_file, index_col=0)
-	md['cycle'] = md.header.str.split('pheno', expand=True)[0]
+	md['networkFeature'] = md.header.str.split('pheno', expand=True)[0]
 	
 	md['mutations'] = md.cycle.map(dict(mutations))
 	md.to_csv(md_file)
