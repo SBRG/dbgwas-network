@@ -157,7 +157,7 @@ def read_json_file(filename, **kwargs):
         js_graph = json.load(f)
     return cytoscape_graph(js_graph, **kwargs)
 
-def get_endnodes(csgraph):
+def get_endnodes(csgraph, graph):
     """Find the 'endnodes' of the cycle i.e. nodes that connect the cycle to the larger graph.
     Assumes that the endnodes of a cycle have the largest total value.
     Parameters
@@ -170,11 +170,11 @@ def get_endnodes(csgraph):
         size 2 tuple of endnode ids.
     """
     # nodeends are where bifurcations from mutation start/end so we assume that node
-    # will appear in most genome compared to other nodes in the cycle
-    node_totals = np.array([int(csgraph.nodes[i]['total']) for i in csgraph.nodes])
+    # will appear in most genome compared to other nodes in the cycle and they will have degree > 2
+    high_deg_nodes = [i for i in csgraph.nodes if graph.degree[i] > 2]
+    node_totals = np.array([int(csgraph.nodes[i]['total']) for i in high_deg_nodes])
     end1, end2 = np.argpartition(node_totals, -2)[-2:]
-    all_nodes = list(csgraph.nodes)
-    return all_nodes [end1], all_nodes[end2]
+    return high_deg_nodes[end1], high_deg_nodes[end2]
 
 
 def get_paths(csgraph, endnodes):
@@ -514,10 +514,10 @@ def jsontoseq(json_dir, tgen, minmaf=0.1, fasta_out='component_seqs.fa',
                     print(f'\tNo SigNodes; skipping {cyc}')
                     continue
                 csgraph = nx.subgraph(comp_graph, cyc) # get the graph of cycles
-                endnodes = get_endnodes(csgraph) # get the 'ends' of the cycle
+                endnodes = get_endnodes(csgraph, comp_graph) # get the 'ends' of the cycle
                 # get all the paths across the cycle, one for each mutation
                 p1, p2 = get_paths(csgraph, endnodes)
-                for cspath in p1, p2:                   
+                for cspath in p1, p2:    
                     phenotype = pathtopheno(csgraph, cspath[1:-1])
                     header = f'component{comp}cycle{cnum}{phenotype}'
                     seq = process_feature(comp_graph, cspath, phenotype, fout, header)
