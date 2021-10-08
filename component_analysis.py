@@ -10,6 +10,9 @@ import numpy as np
 from Bio.Seq import Seq
 import itertools
 import pandas as pd
+import glob
+import os 
+
 
 def cytoscape_graph(data, mincount, attrs=None, name="name", ident="id"):
     """
@@ -461,7 +464,7 @@ def process_feature(comp_graph, path, pheno, fout, header):
     write_to_fasta(header, feat_seq, fout)
     return feat_seq
 
-def jsontoseq(directory, tgen, minmaf=0.1, fasta_out='component_seqs.fa',
+def jsontoseq(json_dir, tgen, minmaf=0.1, fasta_out='component_seqs.fa',
              md_out='components_md.csv'):
     """
     Create sequence fasta files of all 'genetic events' from all the json network files in
@@ -473,7 +476,7 @@ def jsontoseq(directory, tgen, minmaf=0.1, fasta_out='component_seqs.fa',
     
     Parameter
     ---------
-    directory: str, os.PATH
+    json_dir: str, os.PATH
         path to the directory that contains the cytoscape json files created by DBGWAS 
     tgen: int
         total number of genomes used in the DBGWAS analysis
@@ -488,7 +491,7 @@ def jsontoseq(directory, tgen, minmaf=0.1, fasta_out='component_seqs.fa',
     """
     metadata = []
     with open(fasta_out, 'w') as fout:
-        for jsonf in glob.glob(directory + '*.json'):
+        for jsonf in glob.glob(json_dir + '*.json'):
             
             comp = os.path.basename(jsonf).replace('.json', '').split('_')[-1]
             print('Processing component', comp)
