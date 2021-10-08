@@ -320,7 +320,7 @@ def hassignodes(graph, path):
                 return True
         except ValueError as e:
             continue
-        return False
+    #return False
 
 def pathtopheno(graph, path):
     """
