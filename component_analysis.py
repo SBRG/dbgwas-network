@@ -316,11 +316,7 @@ def hassignodes(graph, path):
     """
     for nd in path:
         try:
-            if nd == 'n114736':
-                print(graph.nodes[nd]['qValue'])
-
             if float(graph.nodes[nd]['qValue']) < 0.05:
-                print('QVALUE', nd, graph.nodes[nd]['qValue'])
                 return True
         except ValueError as e:
             continue
@@ -341,8 +337,7 @@ def pathtopheno(graph, path):
         name of the more frequent phenotype; either 'pheno0' or 'pheno1'
     """
     p0_freq = [calc_node_frequency(graph, i, 'pheno0') for i in path]
-    p1_freq = [calc_node_frequency(graph, i, 'pheno1') for i in path]
-    print('FREQUENCY', p0_freq, p1_freq)
+    p1_freq = [calc_node_frequency(graph, i, 'pheno1') for i in path] 
     p0mean, p1mean = np.mean(p0_freq), np.mean(p1_freq)
     return 'pheno0' if max(p0mean, p1mean) == p0mean else 'pheno1'
 
@@ -522,8 +517,7 @@ def jsontoseq(json_dir, tgen, minmaf=0.1, fasta_out='component_seqs.fa',
                 endnodes = get_endnodes(csgraph) # get the 'ends' of the cycle
                 # get all the paths across the cycle, one for each mutation
                 p1, p2 = get_paths(csgraph, endnodes)
-                for cspath in p1, p2:
-                    print("CSPATH", cspath, cspath[1:-1])
+                for cspath in p1, p2:                   
                     phenotype = pathtopheno(csgraph, cspath[1:-1])
                     header = f'component{comp}cycle{cnum}{phenotype}'
                     seq = process_feature(comp_graph, cspath, phenotype, fout, header)
