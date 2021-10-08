@@ -316,9 +316,11 @@ def hassignodes(graph, path):
     """
     for nd in path:
         try:
-            return float(graph.nodes[nd]['qValue']) < 0.05
+            if float(graph.nodes[nd]['qValue']) < 0.05:
+                return True
         except ValueError as e:
-            return False
+            continue
+        return False
 
 def pathtopheno(graph, path):
     """
@@ -509,6 +511,7 @@ def jsontoseq(json_dir, tgen, minmaf=0.1, fasta_out='component_seqs.fa',
                 
             for cnum, cyc in enumerate(cycles):
                 if not hassignodes(comp_graph, cyc):
+                    print(f'\tNo SigNodes; skipping {cyc}')
                     continue
                 csgraph = nx.subgraph(comp_graph, cyc) # get the graph of cycles
                 endnodes = get_endnodes(csgraph) # get the 'ends' of the cycle
