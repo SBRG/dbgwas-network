@@ -408,7 +408,9 @@ def check_mge(comp_graph):
         if MGE is detected, returns the associated phenotype (pheno0 or pheno1) else 
         returns False
     """
-    signodes = [nd for nd in comp_graph.nodes if comp_graph.nodes[nd]['significant'] == 'Yes']
+    signodes = [nd for nd in comp_graph.nodes if hassignodes(comp_graph, [nd])]
+    #print
+    print(signodes)
     if len(signodes) < 2:
         return False
     p0_freq = [calc_node_frequency(comp_graph, nd, 'pheno0') for nd in signodes]
@@ -510,13 +512,15 @@ def jsontoseq(json_dir, tgen, minmaf=0.1, fasta_out='component_seqs.fa',
                 metadata.append([header, seq, ';'.join(mge_path)])
                 
             for cnum, cyc in enumerate(cycles):
-                if len(cyc) < 5 or not hassignodes(comp_graph, cyc):
+                if not hassignodes(comp_graph, cyc):
                     print(f'\tNo SigNodes; skipping {cyc}')
                     continue
                 csgraph = nx.subgraph(comp_graph, cyc) # get the graph of cycles
-                endnodes = get_endnodes(csgraph, comp_graph) # get the 'ends' of the cycle
+                endnodes = get_endnodes(csgraph, comp_graph) # get the 'ends' of the cycle	
                 # get all the paths across the cycle, one for each mutation
                 p1, p2 = get_paths(csgraph, endnodes)
+                if len(p1) < 3 or len(p2) < 3: #TODO: fix this, some graphs have mutliple nodes with deg >3
+                    continue
                 for cspath in p1, p2:    
                     phenotype = pathtopheno(csgraph, cspath[1:-1])
                     header = f'component{comp}cycle{cnum}{phenotype}'
