@@ -409,10 +409,8 @@ def check_mge(comp_graph):
         returns False
     """
     signodes = [nd for nd in comp_graph.nodes if hassignodes(comp_graph, [nd])]
-    #print
-    print(signodes)
-    if len(signodes) < 2:
-        return False
+    #if len(signodes) < 2:
+        #return False
     p0_freq = [calc_node_frequency(comp_graph, nd, 'pheno0') for nd in signodes]
     p1_freq = [calc_node_frequency(comp_graph, nd, 'pheno1') for nd in signodes]
     check_max = []
