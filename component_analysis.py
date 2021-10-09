@@ -251,7 +251,7 @@ def getmatch(node1, node2, G):
             edges.append((n1, n2, {'overlap': overlap}))
     G.add_edges_from(edges)
 
-def concat_paths(path, vitree, name):
+def concat_paths(path, vitree, name, endorient=None):
     # find all paths through the start and end
     pstarts = [path[0], path[0] + '_rc']
     pends = [path[-1], path[-1] + '_rc']
@@ -268,6 +268,13 @@ def concat_paths(path, vitree, name):
     if len(spaths) == 1:
         return spaths[0]
     # more than one possible path
+	# choose the where the orientation of endnodes matches that of the already calculated path through the cycle
+    if endorient:
+        chosen_path = [i for i in spaths if i[0] == endorient[0] and i[-1] == endorient[-1]]
+        if chosen_path:
+            #print(chosen_path[0])
+            return chosen_path[0]
+	# choose path with the highest overlap between sequences
     overlaps = [get_total_overlap(vitree, spath) for spath in spaths]
     return spaths[overlaps.index(max(overlaps))]
 
@@ -284,8 +291,7 @@ def get_seqfrompaths(vitree, vitree_path):
 
 def concatseq(vitree, n1, n2):
     """
-    Returns whether there are any 'significant' node i.e. node enriched in DBGWAS
-    within the path
+    Concats sequences from the nodes n1 and n2, removing any overlap from n2. 
     ----------
     vitree: networkx.Graph
         graph that contains the target nodes n1, n2
@@ -449,6 +455,7 @@ def get_longest_path(comp_graph):
         all_paths.remove(longest_path)
     return longest_path
 
+#TODO depracated: remove later
 def process_mge(comp_graph, mge, metadata, fout):
     mge_path = get_longest_path(comp_graph)
     mge_subgraph = nx.subgraph(comp_graph, mge_path)
@@ -458,13 +465,13 @@ def process_mge(comp_graph, mge, metadata, fout):
     header = f'component{comp}MGE0{mge}'
     write_to_fasta(header, seq, fout)
 
-def process_feature(comp_graph, path, pheno, fout, header):
+def process_feature(comp_graph, path, pheno, fout, header, endorient=None):
     feat_subgraph = nx.subgraph(comp_graph, path)
     feat_pathgraph = get_nodeconnections(feat_subgraph, path)
-    feat_seqpath = concat_paths(path, feat_pathgraph, name=header)
+    feat_seqpath = concat_paths(path, feat_pathgraph, name=header, endorient=endorient)
     feat_seq = get_seqfrompaths(feat_pathgraph, feat_seqpath)
     write_to_fasta(header, feat_seq, fout)
-    return feat_seq
+    return feat_seq, feat_seqpath
 
 def jsontoseq(json_dir, tgen, minmaf=0.1, fasta_out='component_seqs.fa',
              md_out='components_md.csv'):
@@ -506,8 +513,8 @@ def jsontoseq(json_dir, tgen, minmaf=0.1, fasta_out='component_seqs.fa',
                 print(f'\tPossible {mge} associated MGE detected.')
                 header = f'component{comp}MGE{mge}'
                 mge_path = get_longest_path(comp_graph)
-                seq = process_feature(comp_graph, mge_path, mge, fout, header)
-                metadata.append([header, seq, ';'.join(mge_path)])
+                seq, truepath = process_feature(comp_graph, mge_path, mge, fout, header)
+                metadata.append([header, seq, ';'.join(truepath)])
                 
             for cnum, cyc in enumerate(cycles):
                 if not hassignodes(comp_graph, cyc):
@@ -517,13 +524,14 @@ def jsontoseq(json_dir, tgen, minmaf=0.1, fasta_out='component_seqs.fa',
                 endnodes = get_endnodes(csgraph, comp_graph) # get the 'ends' of the cycle	
                 # get all the paths across the cycle, one for each mutation
                 p1, p2 = get_paths(csgraph, endnodes)
-                if len(p1) < 3 or len(p2) < 3: #TODO: fix this, some graphs have mutliple nodes with deg >3
+                if len(p1) < 3 or len(p2) < 3: #TODO: fix this, some graphs have mutliple nodes with deg >3,
                     continue
                 for cspath in p1, p2:    
                     phenotype = pathtopheno(csgraph, cspath[1:-1])
                     header = f'component{comp}cycle{cnum}{phenotype}'
-                    seq = process_feature(comp_graph, cspath, phenotype, fout, header)
-                    metadata.append([header, seq, ';'.join(cspath)])
+                    endorient = (truepath[0], truepath[-1]) if cspath == p2 else None
+                    seq, truepath = process_feature(comp_graph, cspath, phenotype, fout, header, endorient)
+                    metadata.append([header, seq, ';'.join(truepath)])
     write_metadata(metadata, md_out)
 
 if __name__ == '__main__':
