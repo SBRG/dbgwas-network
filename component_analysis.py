@@ -455,18 +455,6 @@ def get_longest_path(comp_graph):
         all_paths.remove(longest_path)
     return longest_path
 
-#TODO depracated: remove later
-def process_mge(comp_graph, mge, metadata, fout):
-    mge_path = get_longest_path(comp_graph)
-    mge_subgraph = nx.subgraph(comp_graph, mge_path)
-    mge_pgraph = get_nodeconnections(mge_subgraph, mge_path)
-    seq_path = concat_paths(mge_path, mge_pgraph, name='MGE')
-    if not seq_path:
-        return
-    seq = get_seqfrompaths(mge_pgraph, seq_path)
-    header = f'component{comp}MGE0{mge}'
-    write_to_fasta(header, seq, fout)
-
 def process_feature(comp_graph, path, pheno, fout, header, endorient=None):
     feat_subgraph = nx.subgraph(comp_graph, path)
     feat_pathgraph = get_nodeconnections(feat_subgraph, path)
