@@ -461,6 +461,8 @@ def process_mge(comp_graph, mge, metadata, fout):
     mge_subgraph = nx.subgraph(comp_graph, mge_path)
     mge_pgraph = get_nodeconnections(mge_subgraph, mge_path)
     seq_path = concat_paths(mge_path, mge_pgraph, name='MGE')
+    if not seq_path:
+        return
     seq = get_seqfrompaths(mge_pgraph, seq_path)
     header = f'component{comp}MGE0{mge}'
     write_to_fasta(header, seq, fout)
@@ -469,6 +471,8 @@ def process_feature(comp_graph, path, pheno, fout, header, endorient=None):
     feat_subgraph = nx.subgraph(comp_graph, path)
     feat_pathgraph = get_nodeconnections(feat_subgraph, path)
     feat_seqpath = concat_paths(path, feat_pathgraph, name=header, endorient=endorient)
+    if not feat_seqpath:
+        return 0, 0
     feat_seq = get_seqfrompaths(feat_pathgraph, feat_seqpath)
     write_to_fasta(header, feat_seq, fout)
     return feat_seq, feat_seqpath
@@ -514,7 +518,8 @@ def jsontoseq(json_dir, tgen, minmaf=0.1, fasta_out='component_seqs.fa',
                 header = f'component{comp}MGE{mge}'
                 mge_path = get_longest_path(comp_graph)
                 seq, truepath = process_feature(comp_graph, mge_path, mge, fout, header)
-                metadata.append([header, seq, ';'.join(truepath)])
+                if seq and truepath:
+                    metadata.append([header, seq, ';'.join(truepath)])
                 
             for cnum, cyc in enumerate(cycles):
                 if not hassignodes(comp_graph, cyc):
@@ -531,7 +536,8 @@ def jsontoseq(json_dir, tgen, minmaf=0.1, fasta_out='component_seqs.fa',
                     header = f'component{comp}cycle{cnum}{phenotype}'
                     endorient = (truepath[0], truepath[-1]) if cspath == p2 else None
                     seq, truepath = process_feature(comp_graph, cspath, phenotype, fout, header, endorient)
-                    metadata.append([header, seq, ';'.join(truepath)])
+                    if seq and truepath:
+                        metadata.append([header, seq, ';'.join(truepath)])
     write_metadata(metadata, md_out)
 
 if __name__ == '__main__':
