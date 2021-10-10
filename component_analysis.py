@@ -218,12 +218,6 @@ def get_nodeconnections(csgraph, path):
     
     return vitree
 
-# def endOverlap(a, b):
-#     for i in range(0, len(a)):
-#         if b.startswith(a[-i:]):
-#             return i
-#     return 0
-
 def endOverlap(a, b):
     for i in range(0, len(a)):
         if b.startswith(a[i:]):
@@ -237,9 +231,7 @@ def getmatch(node1, node2, G):
     edges = []
     for n1, n2 in nproduct:
         overlap = endOverlap(G.nodes[n1]['sequence'],
-                             G.nodes[n2]['sequence'])
-        # TODO: need to check if there is a match with the reverse_comp,
-        # if so, find the one with the larger overlap
+                             G.nodes[n2]['sequence'])      
         if not overlap:
             continue
         try:
@@ -259,8 +251,7 @@ def concat_paths(path, vitree, name, endorient=None):
     spaths = [nx.simple_paths.all_simple_paths(vitree, source, target, cutoff=len(path))
              for source, target in product]
     spaths = [list(i) for i in spaths]
-    spaths = [i[0] for i in spaths if i] # get rid of some nested lists
-    
+    spaths = list(itertools.chain(*spaths)) # get rid of some nested lists 
     if not any(spaths):
         print(f'\tNo paths found for {name}; check manually')
         return []
@@ -272,7 +263,6 @@ def concat_paths(path, vitree, name, endorient=None):
     if endorient:
         chosen_path = [i for i in spaths if i[0] == endorient[0] and i[-1] == endorient[-1]]
         if chosen_path:
-            #print(chosen_path[0])
             return chosen_path[0]
 	# choose path with the highest overlap between sequences
     overlaps = [get_total_overlap(vitree, spath) for spath in spaths]
