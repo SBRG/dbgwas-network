@@ -123,6 +123,7 @@ def yield_paths(fa):
 		rs = next(parse_fa)
 		id2, seq2 = rs.id, rs.seq
 		if id2.split('pheno')[0] != cycle:
+			print('IDS', id1, id2)
 			raise ValueError('Sequence id mismatch; make sure fasta is sorted i.e. >pheno0 followed by >pheno1')
 		# switch so that pheno0 is always id1, seq1
 		if 'pheno1' in id1:

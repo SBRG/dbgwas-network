@@ -252,20 +252,22 @@ def concat_paths(path, vitree, name, endorient=None):
              for source, target in product]
     spaths = [list(i) for i in spaths]
     spaths = list(itertools.chain(*spaths)) # get rid of some nested lists 
+
+    # if orient on endnodes of one of the paths have already been calculated, then this path must have
+    # the same orient as the other path, if no such path is found leave it be
+    if endorient:
+        endmatch = [i for i in spaths if i[0] == endorient[0] and i[-1] == endorient[-1]]
+        if endmatch:
+            spaths = endmatch
     if not any(spaths):
         print(f'\tNo paths found for {name}; check manually')
         return []
-    # for each path find the one with the highest overlap
     if len(spaths) == 1:
         return spaths[0]
     # more than one possible path
-	# choose the where the orientation of endnodes matches that of the already calculated path through the cycle
-    if endorient:
-        chosen_path = [i for i in spaths if i[0] == endorient[0] and i[-1] == endorient[-1]]
-        if chosen_path:
-            return chosen_path[0]
 	# choose path with the highest overlap between sequences
     overlaps = [get_total_overlap(vitree, spath) for spath in spaths]
+    print(overlaps)
     return spaths[overlaps.index(max(overlaps))]
 
 def get_total_overlap(vitree, spath):
