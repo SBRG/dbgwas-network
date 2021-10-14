@@ -104,7 +104,7 @@ def yield_paths(fa):
 		list containing the name of current cycle and sequnce of the paths in that cycle
 	Returns
 	-------
-		returns 0 when at EOF
+		returns 0 when EOF is reached
 	"""
 	parse_fa = SeqIO.parse(fa, 'fasta')
 	rs = next(parse_fa)
@@ -124,7 +124,7 @@ def yield_paths(fa):
 		id2, seq2 = rs.id, rs.seq
 		if id2.split('pheno')[0] != cycle:
 			print('IDS', id1, id2)
-			raise ValueError('Sequence id mismatch; make sure fasta is sorted i.e. >pheno0 followed by >pheno1')
+			raise ValueError('Sequence id mismatch; make sure fasta is sorted i.e. >pheno0 followed by >pheno1 or vice-versa')
 		# switch so that pheno0 is always id1, seq1
 		if 'pheno1' in id1:
 			id1, id2 = id2, id1
