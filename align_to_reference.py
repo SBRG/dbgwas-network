@@ -137,12 +137,12 @@ def get_mut_pos(muts, genome_pos):
     #p1, p2 = [int(i) for i in genome_pos[1:-1].split(',')]
 	p1, p2 = genome_pos
 	fwd = p1 < p2
-    # blast range being inclusive while python is exclusive
+    # blast range is inclusive while python is exclusive
 	if fwd:
 		p2 += 1
 	else:
 		p1 -= 1
-    #sum reverse or forward depending on fwd or revcomp
+    #sum or diff depending on fwd or revcomp
 	traverse = lambda x,y: x+y if fwd else x-y
 	adj = -1 if fwd else 1
 	start = p1
@@ -182,8 +182,7 @@ def get_positions_dict(md, name):
 	mge_idx = md[md.header.str.contains('MGE')].index
 	pos_df = md.loc[set(cycle_idx).union(mge_idx)]
 	pos_df.dropna(subset=[pos_name], inplace=True)
-	pos_df.sort_values(pos_name, inplace=True, key=lambda x: sorted(x))
-	
+	pos_df.sort_values(pos_name, inplace=True)
 	for idx, row in pos_df.iterrows():
 		if 'MGE' in row.header:
 			pos_dict.update({row.header: row[pos_name]})
@@ -191,6 +190,8 @@ def get_positions_dict(md, name):
 			mps = get_mut_pos(row.mutations, row[pos_name])
 			for mp, ps in enumerate(mps):
 				pos_dict.update({row.header + 'mutation' + str(mp): ps})	
+
+	return pos_dict
 
 
 def mapcyclefeatures(md, feats, name):
@@ -247,18 +248,18 @@ def maptofeatures(md, feats, name):
 
         #found overlap, match can overlap multiple features
         while hasoverlap(pos, genome_pos):
-              try:
-                matched.append(feats.loc[idx, 'locus_tag'])
-                idx += 1
-                genome_pos = feats.loc[idx, ['start', 'end']].values
-              except KeyError:
-                idx = starting_idx
-                break
+            try:
+              matched.append(feats.loc[idx, 'locus_tag'])
+              idx += 1
+              genome_pos = feats.loc[idx, ['start', 'end']].values
+            except KeyError:
+              idx = starting_idx
+              break
         if matched:
             matched_dict.update({qseqid: ';'.join(matched)})
         # need to reset idx and check again since multiple MGE can map to same feats
        	idx = starting_idx
-    combined_dict = combine_dict(match_dict)
+    combined_dict = combine_dict(matched_dict)
     md[name + '_feats'] = md['header'].map(combined_dict)
 
 
@@ -269,10 +270,11 @@ def combine_dict(matched_dict):
 	combined_dict = {}
 	for key, vals in matched_dict.items():
 		name = key.split('mutation')[0]
-		if name in x:
-			x[name].extend(vals)
+		vals = ';'.join(vals) if type(vals) == list else vals
+		if name in combined_dict:
+			combined_dict[name] = combined_dict[name] + ';' + vals
 		else:
-			x[name] = vals.copy()
+			combined_dict[name] = vals
 	return combined_dict
 	
 def hasoverlap(kmer_range, gfeat):
@@ -293,8 +295,8 @@ def hasoverlap(kmer_range, gfeat):
 	"""
 
 	# snp
-	if len(abs(kmer_range[0] - kmer_range[1])) == 1:
-		return gfeat[0] <= kmer_range <= gfeat[1]
+	if abs(kmer_range[0] - kmer_range[1]) == 1:
+		return gfeat[0] <= kmer_range[0] <= gfeat[1]
 
 	a, b = sorted(kmer_range)
 	c, d = sorted(gfeat)
@@ -333,7 +335,6 @@ def getfeatures(gb):
 
 	
 if __name__ == '__main__':
-	print("UNDER CONSTRUCTION; COME BACK LATER")
 	
 	import argparse
 	p = argparse.ArgumentParser(description='Annotate the mutations using reference genomes. The annotations are updated in the input\
@@ -366,6 +367,7 @@ if __name__ == '__main__':
 			map_blast(matched_seq, md_df, name)
 			feats = getfeatures(gen)
 			maptofeatures(md_df, feats, name)
+	print('SAVING')
 	md_df.to_csv('test_md.csv')
 		
 			
