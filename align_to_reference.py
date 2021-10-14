@@ -8,13 +8,7 @@ import subprocess
 import pandas as pd
 import numpy as np
 from collections import OrderedDict
-"""
-if mutation is within the range of a features (CDS, rRNA, tRNA etc): note that,
-if mutation is within CDS, get the change in AA sequence(if any)
-save the stuff in the metadata
-if MGE then just do normal BLAST and look for hits:
-if hits, write the coordinates to the metadata file
-"""
+
 def makeblastdb(gen, direct):
 	"""
 	Make blastn database from the genbank file.
