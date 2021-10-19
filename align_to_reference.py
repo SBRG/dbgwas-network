@@ -3,11 +3,14 @@
 import os
 import re
 from Bio import SeqIO
+from Bio.Seq import Seq
 import tempfile
 import subprocess
 import pandas as pd
 import numpy as np
 from collections import OrderedDict
+import itertools
+
 
 def makeblastdb(gen, direct):
 	"""
@@ -59,7 +62,7 @@ def runblast(fa, db, name, direct):
 def process_blastout(blast_out, pheno):
 	"""
 	Parse blast results to find the DBGWAS sequences that match the reference genome
-	
+
 	Parameters
 	----------
 	blast_out: str, path.PATH
@@ -106,7 +109,7 @@ def map_blast(blast_df, md_df, name):
 	"""
 	# for the all sequences there, map (start, end) -> 'pos' 
 	pos_map = dict(zip(blast_df.set_index('qseqid').index, zip(blast_df['sstart'], blast_df['send'])))
-	md_df[f'{name}_pos'] = md_df.header.map(pos_map)
+	md_df[f'{name}_kmer_pos'] = md_df.header.map(pos_map)
 	# for mutations, convert the positions to
 
 def get_len(prange):
@@ -168,11 +171,11 @@ def get_positions_dict(md, name):
 	pos_dict: dict, {str:tuple}
 		dict containing the name of the mutation and its position in genome
 	"""
-	pos_name = name + '_pos'
+	pos_name = name + '_kmer_pos'
 	pos_dict = OrderedDict()
 	# get rows with cycles that have mapped completely to genome
 	cycle_df = md[md.header.str.contains('cycle')]
-	cycle_idx = cycle_df.where(cycle_df.seq.apply(lambda x: len(x)) == cycle_df[name + '_pos'].apply(get_len)).dropna(subset=['header']).index
+	cycle_idx = cycle_df.where(cycle_df.seq.apply(lambda x: len(x)) == cycle_df[name + '_kmer_pos'].apply(get_len)).dropna(subset=['header']).index
 	mge_idx = md[md.header.str.contains('MGE')].index
 	pos_df = md.loc[set(cycle_idx).union(mge_idx)]
 	pos_df.dropna(subset=[pos_name], inplace=True)
@@ -187,28 +190,21 @@ def get_positions_dict(md, name):
 
 	return pos_dict
 
-
-def mapcyclefeatures(md, feats, name):
+def get_mindist(genome_pos, fpos):
 	"""
-	Maps mutations to features in the genome, updates the info in the metadata
-    md: pd.DataFrame
-        pandas dataframe containing the DBGWAS sequence metadata
-    feats: pd.DataFrame
-        pandas dataframe contaning reference genome feature info
-    name: string
-        name of the reference
-    """
+	Get the minimum distance between the starts and the ends of the kmer's genome pos and feature pos
+	"""
+	#genome pos is always tuple and so is the fpos
+	combo = itertools.product(genome_pos, fpos)
+	min_dist = 10e9
+	for pair in combo:
+		min_dist = min(min_dist, abs(pair[0] - pair[1]))
+	return min_dist
 
-	# filter cycles where the length of the seq path doesn't match the length of the region mapped to the genome
-	cycle_df = md.where(md.seq.apply(lambda x: len(x)) == md[name + '_pos'].apply(get_len)).dropna(subset=['header'])
-	cycle_df = cycle_df[cycle_df.header.str.contains('cycle')]
-	
-	# for each cycle, find the location(s) of the mutations
-    # if the mutations are in the genes then
-	
 def maptofeatures(md, feats, name):
     """
-    Maps MGEs to the features in the genome, updates the info in the metadata
+    Maps the kmers to the features in the genome; in case of intergenic
+	mutations, the nearest feature is mapped instead. Updates the info in the metadata.
 	
 	Parameters
 	----------
@@ -220,7 +216,7 @@ def maptofeatures(md, feats, name):
 		name of the reference
     """
 	# dict needs to preserve the sorted order of positions
-    col = name + '_pos'
+    col = name + '_kmer_pos'
 	# {qseqid: (start, end)}
     pos_dict = get_positions_dict(md, name)
     idx = 0
@@ -229,9 +225,20 @@ def maptofeatures(md, feats, name):
         matched = []
         starting_idx = idx
         genome_pos = feats.loc[idx, ['start', 'end']].values
+
+        # map the closest feature, in case the mutation is intergenic
+       
+        min_dist = get_mindist(genome_pos, pos)
+        closest_match = feats.loc[idx, 'locus_tag']
+
         # keep cycling through genome til you find overlap
         while not hasoverlap(pos, genome_pos):
             try:
+                fdist = get_mindist(genome_pos, pos)
+                min_dist = min(fdist, min_dist)
+                if min_dist == fdist: # new closest feature
+                    closest_match = feats.loc[idx, 'locus_tag']
+
                 idx += 1
                 genome_pos = feats.loc[idx, ['start', 'end']].values
             except KeyError: # no match at all
@@ -240,7 +247,7 @@ def maptofeatures(md, feats, name):
 
         starting_idx = idx # since sorted, all future matches should be after this
 
-        #found overlap, match can overlap multiple features
+        #found overlap, match can overlap multiple features so check them all
         while hasoverlap(pos, genome_pos):
             try:
               matched.append(feats.loc[idx, 'locus_tag'])
@@ -250,22 +257,40 @@ def maptofeatures(md, feats, name):
               idx = starting_idx
               break
         if matched:
-            matched_dict.update({qseqid: ';'.join(matched)})
+            lts = ';'.join(matched)
+        else:
+            lts = closest_match + '(intergenic)'
+            
+        matched_dict.update({qseqid: lts})
         # need to reset idx and check again since multiple MGE can map to same feats
        	idx = starting_idx
-    combined_dict = combine_dict(matched_dict)
+    combined_dict = combine_feat_dict(matched_dict)
+    combined_pos_dict = combine_pos_dict(pos_dict)
     md[name + '_feats'] = md['header'].map(combined_dict)
+    md[name + '_mutation_pos'] = md['header'].map(combined_pos_dict)
 
+def combine_pos_dict(pdict):
+	"""
+	Helper function to combine the positions of multiple mutations within same kmer
+	"""
+	combined_pos_dict = {}
+	for key, vals in pdict.items():
+		name = key.split('mutation')[0]
+		if name in combined_pos_dict:
+			combined_pos_dict[name].append(vals)
+		else:
+			combined_pos_dict[name] = [vals]
+	return combined_pos_dict
 
-def combine_dict(matched_dict):
+def combine_feat_dict(matched_dict):
 	"""
 	Helper function to combine features from multiple mutations in same cycle
 	"""
 	combined_dict = {}
 	for key, vals in matched_dict.items():
 		name = key.split('mutation')[0]
-		vals = ';'.join(vals) if type(vals) == list else vals
-		if name in combined_dict:
+		vals = ';'.join(set(vals)) if type(vals) == list else vals
+		if name in combined_dict and vals not in combined_dict[name]:
 			combined_dict[name] = combined_dict[name] + ';' + vals
 		else:
 			combined_dict[name] = vals
@@ -296,7 +321,18 @@ def hasoverlap(kmer_range, gfeat):
 	c, d = sorted(gfeat)
 		
 	return max(a,c) <= min(b,d)
-	
+
+def getseqdict(gb):
+	seq_dict = {}
+	for refseq in SeqIO.parse(gb, 'genbank'):
+		for feats in refseq.features:
+			try:
+				lt = feats.qualifiers['locus_tag'][0]
+			except KeyError:
+				continue
+			else:
+				seq_dict.update({lt: str(feats.extract(refseq).seq)})
+	return seq_dict
 	
 def getfeatures(gb):
 	""" 
@@ -321,13 +357,184 @@ def getfeatures(gb):
 			try:
 				locus_tag = feat.qualifiers['locus_tag'][0]
 			except KeyError:
-				locus_tag = 'Unknown feature'
-			feats.append([locus_tag, feat.type, int(feat.location.start),
+				continue
+			else:
+				feats.append([locus_tag, feat.type, int(feat.location.start),
 						  int(feat.location.end), feat.location.strand])
 	return pd.DataFrame(feats, columns=['locus_tag', 'ftype', 'start', 'end', 'strand'])
-						
 
+def parse_muts_pos(mut):
+    """
+    Parse mutation positions and find the start and end.
+    """
+    if not mut:
+        return
+    
+    if abs(mut[0] - mut[1]) == 1:
+        return mut[0]
+    return np.arange(min(mut), max(mut))
+
+def parse_muts_strand(mut):
+    return 1 if mut[0] < mut[1] else -1
+
+def replace_str_index(text,index=0,replacement=''):
+	"""
+	Helper function to replace the string at the given index
+	"""
+	if index >= len(text):
+		return ValueError('Mutation position greater than the sequence.')
+	return f'{text[:index]}{replacement}{text[index+1:]}'
+
+def get_aamutation(codon, ncodon, pos):
+	"""
+	Helper function to translate codon to aa
+	"""
+	aa1, aa2 = Seq(codon).translate(), Seq(ncodon).translate()
+	return f'{aa2}{pos//3}{aa1}'
+
+def get_snps(mps, sps, fstrand, mt, seq, ftype, pheno):
+	"""
+	Returns the identity e.g. G23C of SNP mutation within the feature.
+	Parameters
+	----------
+	mps: int
+		mutation position within the feature
+	sps: int (1, -1)
+		strand of the kmer, 1 for pos and -1 for neg
+	fstrand: int (1, -1)
+		strand of the feature the mutation is mapped to
+	mt: str
+		btop representation of mutation e.g. 'GC' 'A-' etc.
+	seq: str
+		sequence of the feature
+	ftype: str
+		type of feature e.g. CDS, rRNA etc.
+	pheno: str, pheno0 or pheno1
+		the phenotype of the reference genome where the feature is pulled from
 	
+	returns
+	-------
+	sub: str
+		mutation information represented by the snp, mapped to the feature position; if
+		feature is CDS, the AA substitution is also added.
+	"""
+	mps = int(mps)
+	if fstrand == sps:
+		point_mt = seq[mps]
+	else:
+		mps -= 1
+		point_mt = Seq(seq[mps]).reverse_complement()
+	check_pos = 0 if pheno == 'pheno0' else 1
+	if mt[check_pos] != point_mt:
+		raise ValueError(f'The kmer mutation does not match the sequence at position {mps}')
+    
+	if point_mt == '-':
+		return 'Del' + str(mps)
+	elif mt[0] == '-':
+		return 'Ins' + str(mps)
+	else:
+		sub = f'{mt[0]}{mps}{mt[1]}'
+        # find the codon string
+		if ftype == 'CDS':
+			codon_start_adj = mps % 3
+			codon_end_adj = 3 - codon_start_adj
+			codon = seq[mps - codon_start_adj: mps + codon_end_adj]
+			new_codon = replace_str_index(codon, codon_start_adj, point_mt)
+			aamutation = get_aamutation(codon, new_codon, mps)
+			sub += f'({aamutation})'
+		return sub
+
+def get_indel(mps, sps, mt, seq, pheno):
+	"""
+	Get mutation information for indel or multiple location mutation
+
+	Parameters
+	----------
+	 mps: int
+         mutation position within the feature
+     sps: int (1, -1)
+         strand of the kmer, 1 for pos and -1 for neg
+     mt: str
+         btop representation of mutation e.g. 'GC' 'A-' etc.
+     seq: str
+         sequence of the feature
+     ftype: str
+         type of feature e.g. CDS, rRNA etc.
+     pheno: str, pheno0 or pheno1
+         the phenotype of the reference genome where the feature is pulled from
+	"""
+
+	current_seq = mt[::2] # sequence of current phenotype
+	sub_seq = mt[1::2] # substituations in the other phenotype
+    
+    # position on btop format mutation string is pheno0pheno1
+    # e.g. 37AGTG23 means 'AT' in pheno0 and 'GG' mutation in pheno1
+	if pheno == 'pheno1':
+		current_seq, sub_seq = sub_seq, current_seq
+    
+	if len(set(current_seq)) == 1 and set(current_seq) == set('-'): # deletion
+		geno = 'Del' + str(min(mps)) + ':' + str(max(mps))
+	elif len(set(sub_seq)) == 1 and set(sub_seq) == set('-'): # insertion
+		geno = 'Ins' + str(min(mps)) + ':' + str(max(mps))
+	else:
+		ans = []
+		[ans.append(f'{orig}{pos}{sub}') for orig, pos, sub in zip(current_seq, mps, sub_seq)]
+		geno = ''.join(ans)
+	return geno
+						
+def get_feature_mutation(cds_md, feats_df, pheno, name):
+	"""
+	For all mutations mapped to features, get the mutation information
+	
+	Parameters
+	----------
+	cds_md: pandas.DataFrame
+		metadata of the kmers to be mapped 
+	feats_df: pandas.DataFrame
+		dataframe containing features the kmers will be mapped to
+	pheno: str, pheno0 or pheno1
+		phenotype of the reference genome
+	name: str
+		name of the reference genome
+	"""
+	mut_map = {}
+	for idx, row in cds_md.iterrows():
+		mutations = []
+		match = feats_df[feats_df.locus_tag == row[name + '_feats']]
+		try:
+			fstart, fend, fstrand, ftype = match[['start', 'end', 'strand', 'ftype']].values[0]
+		except IndexError: #no match
+			continue
+		start = fstart if fstrand == 1 else fend
+		num = 0
+		for mt in re.split(r'(\d+)', row.mutations)[1:-1]:
+			try:
+				int(mt)
+			except ValueError:
+				mut = parse_muts_pos(row[f'{name}_mutation_pos'][num]) # can be int or range
+				sps = parse_muts_strand(row[f'{name}_mutation_pos'][num])
+				if type(mut) == np.ndarray: #indels, multiple bases
+					if any([fstart <= m <= fend for m in mut]):
+						mutations.append(get_indel(mut, sps, mt, 'seq', 'pheno1'))
+					else:
+						m1, m2 = min(mut), max(mut)
+						mutations.append()
+				else: # SNPs
+					if fstart <= mut <= fend:
+						cds_pos = abs(start - mut)
+						mutations.append(get_snps(cds_pos, sps,
+                                                  fstrand, mt,
+                                                  seq_dict[row[f'{name}_feats']],
+                                                  ftype, pheno))
+					else:
+						m1, m2 = mt
+						if pheno == 'pheno0':
+							m1, m2 = m2, m1
+						mutations.append(f'{m1}{mut}{m2}')
+				num += 1
+		mut_map.update({idx:';'.join(mutations)})
+	return mut_map
+
 if __name__ == '__main__':
 	
 	import argparse
@@ -359,9 +566,15 @@ if __name__ == '__main__':
 			blast_outfile = runblast(params['fasta'], db_file, name, tempdir)
 			matched_seq = process_blastout(blast_outfile, pheno)
 			map_blast(matched_seq, md_df, name)
-			feats = getfeatures(gen)
-			maptofeatures(md_df, feats, name)
-	print('SAVING')
+			feats_df = getfeatures(gen)
+			seq_dict = getseqdict(gen)
+			# find the closest feature
+			maptofeatures(md_df, feats_df, name)
+			# find the mutation within the feature, including aa mutation if in CDS
+			cds_md = md_df[md_df.header.str.contains('cycle')].dropna(subset=[f'{name}_feats'])
+			mut_map = get_feature_mutation(cds_md, feats_df, pheno, name)		
+			md_df[f'{name}_mutation_map'] = md_df.index.map(mut_map)
+
 	md_df.to_csv('test_md.csv')
 		
 			
