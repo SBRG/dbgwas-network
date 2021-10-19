@@ -426,7 +426,7 @@ def get_snps(mps, sps, fstrand, mt, seq, ftype, pheno):
 		point_mt = Seq(seq[mps]).reverse_complement()
 	check_pos = 0 if pheno == 'pheno0' else 1
 	if mt[check_pos] != point_mt:
-		raise ValueError(f'The kmer mutation does not match the sequence at position {mps}')
+		return 'No Match'
     
 	if point_mt == '-':
 		return 'Del' + str(mps)
@@ -518,7 +518,7 @@ def get_feature_mutation(cds_md, feats_df, pheno, name):
 						mutations.append(get_indel(mut, sps, mt, 'seq', 'pheno1'))
 					else:
 						m1, m2 = min(mut), max(mut)
-						mutations.append()
+						mutations.append(f'Indel{m1}:{m2}')
 				else: # SNPs
 					if fstart <= mut <= fend:
 						cds_pos = abs(start - mut)
