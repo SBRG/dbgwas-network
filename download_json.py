@@ -37,7 +37,6 @@ def getjsonfile(dbgwas_file, download_file, dest_file,  chrome_loc, driver):
 
         os.rename(download_file, dest_file)
     except ElementClickInterceptedException as e:
-        print(e)
         print(f'Download failed for {dbgwas_file}. Download it manually instead.')
         
 if __name__ == '__main__':
