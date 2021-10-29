@@ -418,13 +418,18 @@ def get_snps(mps, sps, fstrand, mt, seq, ftype, pheno):
 		mutation information represented by the snp, mapped to the feature position; if
 		feature is CDS, the AA substitution is also added.
 	"""
+
+	check_pos = 0 if pheno == 'pheno0' else 1
 	mps = int(mps)
 	if fstrand == sps:
 		point_mt = seq[mps]
+		sub_mt = mt[abs(check_pos-1)]
 	else:
 		mps -= 1
 		point_mt = Seq(seq[mps]).reverse_complement()
-	check_pos = 0 if pheno == 'pheno0' else 1
+		# need to change the sequence from the other (pheno0/pheno1) sequence too
+		sub_mt = Seq(mt[abs(check_pos-1)]).reverse_complement()
+
 	if mt[check_pos] != point_mt:
 		raise ValueError(f'The kmer mutation does not match the sequence at position {mps}')
     
@@ -439,7 +444,7 @@ def get_snps(mps, sps, fstrand, mt, seq, ftype, pheno):
 			codon_start_adj = mps % 3
 			codon_end_adj = 3 - codon_start_adj
 			codon = seq[mps - codon_start_adj: mps + codon_end_adj]
-			new_codon = replace_str_index(codon, codon_start_adj, point_mt)
+			new_codon = replace_str_index(codon, codon_start_adj, sub_mt)
 			aamutation = get_aamutation(codon, new_codon, mps)
 			sub += f'({aamutation})'
 		return sub
