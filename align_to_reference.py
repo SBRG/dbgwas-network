@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 from collections import OrderedDict
 import itertools
-
+from tqdm import tqdm
 
 def makeblastdb(gen, direct):
 	"""
@@ -431,7 +431,7 @@ def get_snps(mps, sps, fstrand, mt, seq, ftype, pheno):
 		sub_mt = Seq(mt[abs(check_pos-1)]).reverse_complement()
 
 	if mt[check_pos] != point_mt:
-		raise ValueError(f'The kmer mutation does not match the sequence at position {mps}')
+		return 'No Match'
     
 	if point_mt == '-':
 		return 'Del' + str(mps)
@@ -523,7 +523,7 @@ def get_feature_mutation(cds_md, feats_df, pheno, name):
 						mutations.append(get_indel(mut, sps, mt, 'seq', 'pheno1'))
 					else:
 						m1, m2 = min(mut), max(mut)
-						mutations.append()
+						mutations.append(f'Indel{m1}:{m2}')
 				else: # SNPs
 					if fstart <= mut <= fend:
 						cds_pos = abs(start - mut)
@@ -567,19 +567,24 @@ if __name__ == '__main__':
 	with tempfile.TemporaryDirectory() as tempdir:
 		for pheno, gen in zip(params['pheno'], params['ref']):
 			name = os.path.basename(gen).split('.')[0]
+	
+			print('BLASTing kmers to the reference')
 			db_file = makeblastdb(gen, tempdir) #make db of reference genome
 			blast_outfile = runblast(params['fasta'], db_file, name, tempdir)
 			matched_seq = process_blastout(blast_outfile, pheno)
 			map_blast(matched_seq, md_df, name)
+			
+			print('Mapping kmers to features')
 			feats_df = getfeatures(gen)
 			seq_dict = getseqdict(gen)
 			# find the closest feature
 			maptofeatures(md_df, feats_df, name)
 			# find the mutation within the feature, including aa mutation if in CDS
+			print('Getting mutation information')
 			cds_md = md_df[md_df.header.str.contains('cycle')].dropna(subset=[f'{name}_feats'])
 			mut_map = get_feature_mutation(cds_md, feats_df, pheno, name)		
 			md_df[f'{name}_mutation_map'] = md_df.index.map(mut_map)
 
-	md_df.to_csv('test_md.csv')
+	md_df.to_csv(params['md'])
 		
 			

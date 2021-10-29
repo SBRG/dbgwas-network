@@ -37,7 +37,6 @@ def getjsonfile(dbgwas_file, download_file, dest_file,  chrome_loc, driver):
 
         os.rename(download_file, dest_file)
     except ElementClickInterceptedException as e:
-        print(e)
         print(f'Download failed for {dbgwas_file}. Download it manually instead.')
         
 if __name__ == '__main__':
@@ -50,7 +49,7 @@ if __name__ == '__main__':
                                              GWAS HTML output.')
     p.add_argument('dbgwas_dir', help=ddir_help)
     p.add_argument('dest_dir', help=dsdir_help)
-    p.add_argument('chome_loc', help='path to chrome driver')
+    p.add_argument('chrome_loc', help='path to chrome driver')
     p.add_argument('download_loc', help='download destination of chrome profile. Default chrome\
     setting is /home/usr/downloads/')
     params = vars(p.parse_args())

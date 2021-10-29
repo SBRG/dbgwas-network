@@ -267,7 +267,6 @@ def concat_paths(path, vitree, name, endorient=None):
     # more than one possible path
 	# choose path with the highest overlap between sequences
     overlaps = [get_total_overlap(vitree, spath) for spath in spaths]
-    print(overlaps)
     return spaths[overlaps.index(max(overlaps))]
 
 def get_total_overlap(vitree, spath):
