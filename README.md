@@ -7,7 +7,7 @@ Analyze and interpret the De bruijn graphs output of DBGWAS using graph based me
   
    - dbgwas_dir: path to the directory containing the component specific visualization file. Directory should end with 'visualisations/components/'
    - dest_dir: path to directory where all the output json files will be saved
-   - chrome_loc: path to chrome driver. You can download the chrome drivers [here]('https://chromedriver.chromium.org/downloads'). Be sure, to match the driver version with the installed browser version.
+   - chrome_loc: path to chrome driver. You can download the chrome drivers [here](https://chromedriver.chromium.org/downloads). Be sure, to match the driver version with the installed browser version.
    - download_loc: download destination of chrome profile. Default chrome setting is /home/usr/downloads/
 
 2. Generate fasta and metadata file from the components. 
