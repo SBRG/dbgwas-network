@@ -1,4 +1,4 @@
-# Dbgwas Network Analysis
+# DBGWAS Network Analysis
 Analyze and interpret the De bruijn graphs output of DBGWAS using graph based method from networkx.
 
 1. Download all the component network in json format.
